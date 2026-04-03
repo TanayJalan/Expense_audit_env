@@ -1,30 +1,30 @@
-# Expense Audit OpenEnv — Docker image
-# Compatible with Hugging Face Spaces (Docker SDK)
-
 FROM python:3.11-slim
 
-# HF Spaces runs as user 1000
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN useradd -m -u 1000 appuser
 
 WORKDIR /app
 
-# Install dependencies first (layer caching)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Copy project
-COPY --chown=appuser:appuser . .
+COPY . .
 
-# Create __init__.py files
-RUN touch env/__init__.py tasks/__init__.py graders/__init__.py baseline/__init__.py
+RUN chown -R appuser:appuser /app
+
+RUN mkdir -p env tasks graders baseline data && \
+    touch env/__init__.py tasks/__init__.py graders/__init__.py \
+          baseline/__init__.py data/__init__.py
 
 USER appuser
 
-# HF Spaces expects port 7860
 EXPOSE 7860
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health')"
+HEALTHCHECK --interval=30s --timeout=15s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:7860/health || exit 1
 
 CMD ["python", "app.py"]
