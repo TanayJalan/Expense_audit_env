@@ -1,3 +1,5 @@
+import sys, os
+sys.path.insert(0, "/app")
 """
 FastAPI server exposing the Expense Audit environment as an HTTP API.
 Required for Hugging Face Spaces deployment.
