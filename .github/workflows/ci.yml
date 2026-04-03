@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Tests & Validation
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite
+        run: python -m pytest tests/ -v --tb=short
+
+      - name: Run OpenEnv validation
+        run: python validate.py --verbose
+
+      - name: Run rule-based baseline (smoke test)
+        run: python baseline/rule_based_agent.py --task all --episodes 5 --seed 42
+
+      - name: Regenerate fixtures
+        run: python data/generate_fixtures.py
+
+      - name: Run quickstart demo
+        run: python quickstart.py --task easy --seed 0
+
+  docker:
+    name: Docker Build & Validate
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t expense-audit-env .
+
+      - name: Run validate inside container
+        run: docker run --rm expense-audit-env python validate.py
+
+      - name: Run tests inside container
+        run: docker run --rm expense-audit-env python -m pytest tests/ -q
+
+      - name: Health check
+        run: |
+          docker run -d -p 7860:7860 --name env-test expense-audit-env
+          sleep 5
+          curl --fail http://localhost:7860/health || (docker logs env-test && exit 1)
+          docker stop env-test
+
+  llm-baseline:
+    name: LLM Baseline (OpenAI)
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Only runs on main-branch pushes and only if secret is set
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run LLM baseline
+        if: env.OPENAI_API_KEY != ''
+        run: |
+          python baseline/run_baseline.py \
+            --task all \
+            --model gpt-4o-mini \
+            --episodes 10 \
+            --seed 42 \
+            --output results/baseline_scores.json
+
+      - name: Upload baseline results
+        if: env.OPENAI_API_KEY != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-scores
+          path: results/baseline_scores.json

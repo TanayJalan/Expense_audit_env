@@ -1,0 +1,120 @@
+name: expense-audit-env
+version: 1.0.0
+description: 'A real-world OpenEnv environment where an AI agent acts as an expense
+  report auditor. The agent reviews employee expense submissions and must identify
+  policy violations, duplicate submissions, and sophisticated fraud patterns. Designed
+  for training and evaluating AI agents on financial compliance reasoning tasks.
+
+  '
+tags:
+- openenv
+- finance
+- audit
+- compliance
+- fraud-detection
+- real-world
+author: expense-audit-env
+license: MIT
+environment:
+  class: ExpenseAuditEnv
+  module: env.environment
+tasks:
+- name: easy
+  display_name: Basic Policy Violation Detection
+  difficulty: easy
+  description: 'Identify line items that exceed per-category spending limits or are
+    missing required receipts.
+
+    '
+  expected_score_random: 0.05
+  expected_score_frontier: 0.85
+  max_steps: 1
+- name: medium
+  display_name: Duplicate Submission & Multi-Violation Detection
+  difficulty: medium
+  description: 'Detect duplicate expense submissions across an employee''s history,
+    alongside standard policy violations.
+
+    '
+  expected_score_random: 0.02
+  expected_score_frontier: 0.7
+  max_steps: 1
+- name: hard
+  display_name: Coordinated Fraud Pattern Detection
+  difficulty: hard
+  description: 'Identify sophisticated fraud signals: split receipts, round-number
+    anomalies, and vendor collusion patterns using org-wide vendor statistics.
+
+    '
+  expected_score_random: 0.01
+  expected_score_frontier: 0.55
+  max_steps: 1
+observation_space:
+  type: structured
+  schema: env.models.Observation
+  fields:
+    report:
+      type: ExpenseReport
+      description: The expense report under review
+    policy:
+      type: CompanyPolicy
+      description: Company expense policy with per-category limits
+    historical_reports:
+      type: List[ExpenseReport]
+      description: Employee's past approved expense reports (medium/hard tasks)
+    vendor_stats:
+      type: Dict
+      description: Org-wide vendor usage statistics (hard task only)
+    step_number:
+      type: int
+    max_steps:
+      type: int
+    task_description:
+      type: str
+action_space:
+  type: structured
+  schema: env.models.Action
+  fields:
+    report_id:
+      type: str
+      description: ID of the report being audited
+    decision:
+      type: AuditDecision
+      enum:
+      - approve
+      - flag
+      - reject
+    flagged_items:
+      type: List[FlaggedItem]
+      description: 'Items flagged as violations. Each has item_id, violation_type,
+        reason, confidence.
+
+        '
+    overall_notes:
+      type: Optional[str]
+reward:
+  range:
+  - -1.0
+  - 1.0
+  shaped: true
+  description: 'Dense reward based on precision/recall of flagged violations. True
+    positives: +reward (scaled by violation severity). False positives: -0.4 penalty
+    (penalise hallucination). False negatives: -0.5 * severity penalty (penalise misses).
+    Decision alignment: ±0.05 to ±0.10 bonus/penalty.
+
+    '
+setup:
+  python: '>=3.9'
+  install: pip install -r requirements.txt
+  test: python -m pytest tests/ -v
+  docker: docker build -t expense-audit-env . && docker run -p 7860:7860 expense-audit-env
+baseline_scores:
+  easy:
+    mean: 0.72
+    std: 0.18
+  medium:
+    mean: 0.51
+    std: 0.22
+  hard:
+    mean: 0.31
+    std: 0.19
