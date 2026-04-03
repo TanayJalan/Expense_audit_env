@@ -150,7 +150,7 @@ def health():
 
 
 @app.post("/reset", response_model=ResetResponse)
-def reset(request: ResetRequest):
+def reset(request: ResetRequest = ResetRequest()):
     """Reset the environment and get the first observation."""
     if request.task not in VALID_TASKS:
         raise HTTPException(400, f"Unknown task '{request.task}'. Must be one of {VALID_TASKS}")
