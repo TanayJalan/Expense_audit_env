@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-server = "app:app"
+server = "server.app:main"
 expense-audit-validate = "validate:main"
 
 [tool.setuptools.packages.find]
