@@ -42,7 +42,7 @@ def grade_easy(action: Action, ground_truth: List[Tuple[str, ViolationType]]) ->
     """
     if not ground_truth:
         # No violations — agent should approve
-        return 1.0 if action.decision == AuditDecision.APPROVE else 0.0
+        return 0.999 if action.decision == AuditDecision.APPROVE else 0.001
 
     gt_ids = {iid for iid, _ in ground_truth}
     flagged_ids = {f.item_id for f in action.flagged_items}
@@ -54,7 +54,7 @@ def grade_easy(action: Action, ground_truth: List[Tuple[str, ViolationType]]) ->
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
-    return round(f1, 4)
+    return round(max(0.001, min(0.999, f1)), 4)
 
 
 def grade_medium(action: Action, ground_truth: List[Tuple[str, ViolationType]]) -> float:
@@ -65,7 +65,7 @@ def grade_medium(action: Action, ground_truth: List[Tuple[str, ViolationType]]) 
     Returns score in [0.0, 1.0].
     """
     if not ground_truth:
-        return 1.0 if action.decision == AuditDecision.APPROVE else 0.0
+        return 0.999 if action.decision == AuditDecision.APPROVE else 0.001
 
     gt_dict: Dict[str, ViolationType] = {iid: vt for iid, vt in ground_truth}
     flagged_dict: Dict[str, ViolationType] = {f.item_id: f.violation_type for f in action.flagged_items}
@@ -84,7 +84,7 @@ def grade_medium(action: Action, ground_truth: List[Tuple[str, ViolationType]]) 
     fp_penalty = 0.2 * fp_count
 
     raw = (score_sum / len(gt_dict)) - fp_penalty
-    return round(max(0.0, min(1.0, raw)), 4)
+    return round(max(0.001, min(0.999, raw)), 4)
 
 
 def grade_hard(action: Action, ground_truth: List[Tuple[str, ViolationType]]) -> float:
@@ -95,7 +95,7 @@ def grade_hard(action: Action, ground_truth: List[Tuple[str, ViolationType]]) ->
     Returns score in [0.0, 1.0].
     """
     if not ground_truth:
-        return 1.0 if action.decision == AuditDecision.APPROVE else 0.0
+        return 0.999 if action.decision == AuditDecision.APPROVE else 0.001
 
     gt_dict: Dict[str, ViolationType] = {iid: vt for iid, vt in ground_truth}
     flagged_dict: Dict[str, ViolationType] = {f.item_id: f.violation_type for f in action.flagged_items}
@@ -130,7 +130,7 @@ def grade_hard(action: Action, ground_truth: List[Tuple[str, ViolationType]]) ->
     fp_penalty = 0.25 * fp_count * (max_score / max(len(gt_dict), 1))
 
     raw = (score / max_score) - (fp_penalty / max_score) if max_score > 0 else 0.0
-    return round(max(0.0, min(1.0, raw)), 4)
+    return round(max(0.001, min(0.999, raw)), 4)
 
 
 # ---------------------------------------------------------------------------
